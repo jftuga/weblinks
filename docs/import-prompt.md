@@ -75,8 +75,9 @@ Defaults to propose:
 Show the proposal as a table of source folder, target section and link count.
 Note any folder that the defaults handle in a surprising way.
 
-If the user wants links classified by purpose rather than by folder, and the
-repository's `classification.md` is available, apply its decision rules to
+If the user wants links classified by purpose rather than by folder, and
+`classification.md` is available (it sits beside `weblinks.json` in the
+weblinks data directory), apply its decision rules to
 each link instead of using the folder mapping. Replace its `{{sections}}`
 placeholder with a JSON array of the agreed section names first. Report a low-confidence
 choice as such rather than guessing silently.

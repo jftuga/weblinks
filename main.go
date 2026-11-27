@@ -1,12 +1,15 @@
 // Command weblinks serves a personal bookmark page backed by a JSON file.
 // It parses flags, opens the store, starts the HTTP server on a loopback
-// address and optionally launches a browser at it. The server has no
-// authentication of any kind, so binding it to anything other than localhost
-// exposes the bookmark file to the network.
+// address and optionally launches a browser at it. The store and the
+// classification prompt default to files in the data directory (-dir, or the
+// per-user directory from appdir), where the built-in prompt is written on
+// first run. The server has no authentication of any kind, so binding it to
+// anything other than localhost exposes the bookmark file to the network.
 package main
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,16 +18,31 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/jftuga/weblinks/internal/appdir"
 	"github.com/jftuga/weblinks/internal/bookmarks"
 	"github.com/jftuga/weblinks/internal/launch"
 	"github.com/jftuga/weblinks/internal/linkcheck"
 	"github.com/jftuga/weblinks/internal/web"
 )
+
+// storeName and classificationName are the default file names inside the
+// data directory.
+const (
+	storeName          = "weblinks.json"
+	classificationName = "classification.md"
+)
+
+// defaultClassification is the generic prompt written to the data directory
+// when no classification file exists there yet.
+//
+//go:embed classification.md
+var defaultClassification []byte
 
 // shutdownGrace is how long in-flight requests get to finish on SIGINT.
 const shutdownGrace = 5 * time.Second
@@ -40,25 +58,52 @@ const devVersion = "dev"
 // the fallback used by unstamped builds.
 var version = devVersion
 
-// config holds the command line options.
+// config holds the command line options, with file paths already resolved
+// against the data directory.
 type config struct {
+	dataDir            string
 	addr               string
 	file               string
 	classificationFile string
-	noOpen             bool
-	concurrency        int
-	timeout            time.Duration
-	allowHosts         string
-	showVersion        bool
+	// seedPrompt is true when -classification-file was not given, so the
+	// built-in prompt may be written to the data directory.
+	seedPrompt  bool
+	noOpen      bool
+	concurrency int
+	timeout     time.Duration
+	allowHosts  string
+	showVersion bool
 }
 
 func main() {
-	cfg := parseFlags()
+	// Failing to find the default directory matters only when -dir is not
+	// given, so the error waits for checkDataDir instead of exiting here.
+	defaultDir, dirErr := appdir.Dir()
+	cfg := parseFlags(defaultDir)
 	if cfg.showVersion {
 		fmt.Printf("weblinks %s\n%s\n", resolveVersion(), programURL)
 		return
 	}
-	if err := run(cfg); err != nil {
+	exitOnError(checkDataDir(cfg.dataDir, dirErr))
+	exitOnError(run(cfg))
+}
+
+// checkDataDir rejects an empty data directory, reporting defaultErr as the
+// cause when the default could not be determined.
+func checkDataDir(dir string, defaultErr error) error {
+	switch {
+	case dir != "":
+		return nil
+	case defaultErr != nil:
+		return fmt.Errorf("%w; choose a data directory with -dir", defaultErr)
+	default:
+		return errors.New("-dir must not be empty")
+	}
+}
+
+// exitOnError prints a non-nil err and exits with status 1.
+func exitOnError(err error) {
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "weblinks: %v\n", err)
 		os.Exit(1)
 	}
@@ -78,23 +123,38 @@ func resolveVersion() string {
 	return devVersion
 }
 
-// parseFlags reads the command line into a config.
-func parseFlags() config {
+// parseFlags reads the command line into a config. -file and
+// -classification-file default to files in -dir, so they are resolved after
+// parsing, once -dir is known.
+func parseFlags(defaultDir string) config {
 	var cfg config
+	flag.StringVar(&cfg.dataDir, "dir", defaultDir, "data directory holding the store, its backups and the classification prompt")
 	flag.StringVar(&cfg.addr, "addr", "127.0.0.1:5309", "address to listen on")
-	flag.StringVar(&cfg.file, "file", "weblinks.json", "path to the weblinks JSON file")
-	flag.StringVar(&cfg.classificationFile, "classification-file", "classification.md", "path to the classification prompt (re-read whenever requested)")
+	flag.StringVar(&cfg.file, "file", "", "path to the weblinks JSON file (default "+storeName+" in -dir)")
+	flag.StringVar(&cfg.classificationFile, "classification-file", "", "path to the classification prompt, re-read whenever requested (default "+classificationName+" in -dir)")
 	flag.BoolVar(&cfg.noOpen, "no-open", false, "do not launch a browser on startup")
 	flag.IntVar(&cfg.concurrency, "check-concurrency", 8, "concurrent requests used by the dead-link checker")
 	flag.DurationVar(&cfg.timeout, "check-timeout", 10*time.Second, "per-request timeout for the dead-link checker")
 	flag.StringVar(&cfg.allowHosts, "allow-host", "", "comma-separated host names, besides localhost and IP addresses, that may reach the server")
 	flag.BoolVar(&cfg.showVersion, "version", false, "print the version and exit")
 	flag.Parse()
+
+	if cfg.file == "" {
+		cfg.file = filepath.Join(cfg.dataDir, storeName)
+	}
+	if cfg.classificationFile == "" {
+		cfg.classificationFile = filepath.Join(cfg.dataDir, classificationName)
+		cfg.seedPrompt = true
+	}
 	return cfg
 }
 
-// run opens the store, serves until interrupted, then shuts down cleanly.
+// run prepares the data directory, opens the store, serves until
+// interrupted, then shuts down cleanly.
 func run(cfg config) error {
+	if err := prepareDataDir(cfg); err != nil {
+		return err
+	}
 	store, err := bookmarks.Open(cfg.file)
 	if err != nil {
 		return err
@@ -162,6 +222,27 @@ func run(cfg config) error {
 	defer cancel()
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutdown: %w", err)
+	}
+	return nil
+}
+
+// prepareDataDir creates the data directory and, when -classification-file
+// was not given and the default file does not exist yet, writes the built-in
+// prompt there. An explicitly chosen classification file is never created, so
+// a mistyped path still produces the server's startup warning.
+func prepareDataDir(cfg config) error {
+	if err := appdir.Create(cfg.dataDir); err != nil {
+		return err
+	}
+	if !cfg.seedPrompt {
+		return nil
+	}
+	wrote, err := appdir.Seed(cfg.classificationFile, defaultClassification)
+	if err != nil {
+		return err
+	}
+	if wrote {
+		log.Printf("wrote the default classification prompt to %s", cfg.classificationFile)
 	}
 	return nil
 }

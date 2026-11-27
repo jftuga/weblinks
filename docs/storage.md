@@ -1,7 +1,8 @@
 # Storage
 
-Weblinks are kept in a single JSON file, `weblinks.json` by default
-(`-file` to change it):
+Weblinks are kept in a single JSON file, `weblinks.json` in the
+[data directory](install.md#the-data-directory) by default (`-file` to change
+it):
 
 ```json
 {

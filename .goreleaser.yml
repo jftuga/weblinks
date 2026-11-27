@@ -56,7 +56,7 @@ archives:
     files:
       - LICENSE
       - README.md
-      - classification.md
+      - docs/*.md
 
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}--checksums.txt"

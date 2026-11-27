@@ -4,9 +4,8 @@
     placeholders with absolute paths and writes the result to
     ~/Library/LaunchAgents/, because a LaunchAgent cannot expand ~ or read
     environment variables the way a shell can. The agent runs the compiled
-    binary in the foreground and lets launchd supervise it, so this file
-    deliberately does not invoke `make daemon`, whose nohup-and-background
-    form would exit immediately and defeat KeepAlive.
+    binary in the foreground and lets launchd supervise it; a wrapper that
+    backgrounds the server and exits would defeat KeepAlive.
 -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -20,15 +19,13 @@
         <string>{{BINARY}}</string>
         <string>-addr</string>
         <string>{{ADDR}}</string>
-        <string>-file</string>
-        <string>{{FILE}}</string>
-        <string>-classification-file</string>
-        <string>{{CLASSIFICATION_FILE}}</string>
+        <string>-dir</string>
+        <string>{{DATA_DIR}}</string>
         <string>-no-open</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>{{WORKDIR}}</string>
+    <string>{{DATA_DIR}}</string>
 
     <key>RunAtLoad</key>
     <true/>
