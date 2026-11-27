@@ -72,9 +72,10 @@ notes, and whether the page needs `skip_check`.
 
 ### The prompt file
 
-The prompt is entirely external. By default the server reads
-`./classification.md` (the [included example](../classification.md)); use
-`-classification-file` to choose another path. The included file is a generic
+The prompt is an external file. By default the server reads
+`classification.md` in the [data directory](install.md#the-data-directory),
+writing the generic prompt built into the binary there on first run; use
+`-classification-file` to choose another path. The generic prompt is an
 example you can edit or replace. It must contain the literal placeholder
 `{{sections}}`, which the server replaces with a JSON array of current section
 names in document order. No other template syntax is evaluated. You can add

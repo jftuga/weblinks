@@ -5,7 +5,8 @@ dependencies. Weblinks live in a JSON file that the server reads, writes
 atomically and reloads when it changes on disk. The page is a vanilla HTML,
 CSS and JavaScript client embedded in the binary, so there is nothing to
 build beyond `go build`. Classification help uses a separate, editable
-Markdown prompt; a generic example is included as `classification.md`.
+Markdown prompt; a generic one is built in and written to the data directory
+on first run.
 
 ## Screenshots
 
@@ -53,20 +54,27 @@ make build
 
 A browser opens at <http://127.0.0.1:5309>.
 
+Everything the server keeps is in one data directory: `~/.config/weblinks/`,
+or `$XDG_CONFIG_HOME/weblinks/` when that is set, and `%AppData%\weblinks\`
+on Windows (`-dir` to change it). It holds `weblinks.json`, its `backups/`,
+`classification.md` and, when started by the macOS LaunchAgent,
+`weblinks.log`. The directory is created on first run with permissions that
+only you can read.
+
 | Flag | Default | Purpose |
 | --- | --- | --- |
+| `-dir` | see above | Data directory. |
 | `-addr` | `127.0.0.1:5309` | Listen address. |
-| `-file` | `weblinks.json` | Path to the weblinks store. |
-| `-classification-file` | `classification.md` | External classification prompt, re-read on every request. |
+| `-file` | `weblinks.json` in `-dir` | Path to the weblinks store. |
+| `-classification-file` | `classification.md` in `-dir` | External classification prompt, re-read on every request. |
 | `-no-open` | `false` | Do not launch a browser at startup. |
 | `-check-concurrency` | `8` | Simultaneous requests used by the dead-link checker. |
 | `-check-timeout` | `10s` | Per-request timeout for the dead-link checker. |
 | `-allow-host` | none | Extra host names, comma separated, that may reach the server. |
 | `-version` | `false` | Print the version and exit. |
 
-See [Installing and running](docs/install.md) for the other `make` targets,
-running the binary outside this repository, and starting the server at login
-on macOS.
+See [Installing and running](docs/install.md) for the other `make` targets
+and starting the server at login on macOS.
 
 ## How to import
 
@@ -116,7 +124,8 @@ open in your browser.
 
 ```
 main.go                     flags, wiring, startup and shutdown
-classification.md           external generic prompt with a {{sections}} placeholder
+classification.md           built-in generic prompt with a {{sections}} placeholder
+internal/appdir/            locates the data directory and seeds files into it
 internal/launch/            hands a URL to the OS: the browser, or a file link
 internal/bookmarks/         data model, the JSON store, backups and URL keys
 internal/linkcheck/         concurrent dead-link checker

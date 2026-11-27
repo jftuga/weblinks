@@ -6,8 +6,8 @@
 
 Builds the weblinks binary from the current source, serves a throwaway demo
 store on a spare port, and captures the main page and the bookmarklet's add
-popup in dark mode with headless Chromium. The real weblinks.json is never read
-or written.
+popup in dark mode with headless Chromium. The real data directory, and the
+weblinks.json in it, is never read or written.
 
 Usage, from anywhere in the repository:
 
@@ -224,7 +224,9 @@ def main() -> None:
         build_binary(binary)
         store.write_text(json.dumps(build_store(datetime.now(UTC)), indent=2))
 
-        server = subprocess.Popen([str(binary), "-addr", ADDR, "-file", str(store), "-no-open"])
+        # -dir keeps the server, including its first-run prompt, out of the
+        # real data directory; the demo store is the default file inside it.
+        server = subprocess.Popen([str(binary), "-addr", ADDR, "-dir", tmp, "-no-open"])
         try:
             wait_for_server(10)
             with sync_playwright() as pw:
