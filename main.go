@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -31,9 +32,13 @@ const shutdownGrace = 5 * time.Second
 // programURL is where this program lives, printed alongside the version.
 const programURL = "https://github.com/jftuga/weblinks"
 
-// version is the release this binary was built from. A build can override it
-// with -ldflags "-X main.version=..." to stamp in a tag or commit.
-var version = "0.4.0"
+// devVersion is the placeholder version for a build that was not stamped.
+const devVersion = "dev"
+
+// version is the release this binary was built from. Release builds stamp it
+// from the git tag with -ldflags "-X main.version=..."; see resolveVersion for
+// the fallback used by unstamped builds.
+var version = devVersion
 
 // config holds the command line options.
 type config struct {
@@ -50,13 +55,27 @@ type config struct {
 func main() {
 	cfg := parseFlags()
 	if cfg.showVersion {
-		fmt.Printf("weblinks %s\n%s\n", version, programURL)
+		fmt.Printf("weblinks %s\n%s\n", resolveVersion(), programURL)
 		return
 	}
 	if err := run(cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "weblinks: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// resolveVersion returns the ldflags-stamped version when there is one, and
+// otherwise the module version the Go toolchain embeds: the tag for
+// `go install ...@vX.Y.Z`, or a VCS pseudo-version for a build from a git
+// checkout. It returns devVersion when neither is available, as with go run.
+func resolveVersion() string {
+	if version != devVersion {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return devVersion
 }
 
 // parseFlags reads the command line into a config.
@@ -90,7 +109,7 @@ func run(cfg config) error {
 	server, err := web.NewServer(store, checker, web.Options{
 		BaseURL:            baseURL,
 		AllowHosts:         splitHosts(cfg.allowHosts),
-		Version:            version,
+		Version:            resolveVersion(),
 		ProgramURL:         programURL,
 		ClassificationFile: cfg.classificationFile,
 	})
@@ -151,7 +170,7 @@ func run(cfg config) error {
 // discarding empty entries so a trailing comma is harmless.
 func splitHosts(value string) []string {
 	var hosts []string
-	for _, host := range strings.Split(value, ",") {
+	for host := range strings.SplitSeq(value, ",") {
 		if host = strings.TrimSpace(host); host != "" {
 			hosts = append(hosts, host)
 		}
