@@ -82,9 +82,21 @@ homebrew_casks:
       email: jftuga@users.noreply.github.com
     homepage: https://github.com/jftuga/weblinks
     description: "self-hosted personal bookmarks page"
+    # The cask installs only the binary; `weblinks -install-agent` is how a
+    # user opts in to starting the server at login. The agent's label goes
+    # under zap, not uninstall: Homebrew runs a cask's uninstall directives on
+    # every upgrade too, and uninstall launchctl also deletes the plist, which
+    # would remove the user's agent each time.
+    zap:
+      launchctl:
+        - com.jftuga.weblinks
     hooks:
       post:
+        # The kickstart makes a loaded agent run the upgraded binary, which it
+        # reaches through the stable $(brew --prefix)/bin symlink. It is
+        # skipped when the agent is not loaded, and never fails the install.
         install_steps: |
           on_macos do
             run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/weblinks"]
+            run "/bin/sh", args: ["-c", "/bin/launchctl print gui/$(/usr/bin/id -u)/com.jftuga.weblinks >/dev/null 2>&1 && /bin/launchctl kickstart -k gui/$(/usr/bin/id -u)/com.jftuga.weblinks"], must_succeed: false
           end

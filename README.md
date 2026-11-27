@@ -45,14 +45,23 @@ the URL and title of the current page filled in:
 
 ## Quick start
 
-Requires Go 1.27 or later.
+Install with Homebrew on macOS or Linux, then run it:
+
+```
+brew install --cask jftuga/tap/weblinks
+weblinks
+```
+
+Or build from a clone, which requires Go 1.27 or later:
 
 ```
 make build
 ./weblinks
 ```
 
-A browser opens at <http://127.0.0.1:5309>.
+A browser opens at <http://127.0.0.1:5309>. On macOS,
+`weblinks -install-agent` starts the server at login instead; see
+[starting at login](docs/install.md#starting-at-login-macos).
 
 Everything the server keeps is in one data directory: `~/.config/weblinks/`,
 or `$XDG_CONFIG_HOME/weblinks/` when that is set, and `%AppData%\weblinks\`
@@ -72,6 +81,8 @@ only you can read.
 | `-check-timeout` | `10s` | Per-request timeout for the dead-link checker. |
 | `-allow-host` | none | Extra host names, comma separated, that may reach the server. |
 | `-version` | `false` | Print the version and exit. |
+| `-install-agent` | `false` | macOS: start the server at login with the given `-addr`, `-dir` and `-allow-host`, then exit. |
+| `-uninstall-agent` | `false` | macOS: stop the login agent and remove it, then exit. |
 
 See [Installing and running](docs/install.md) for the other `make` targets
 and starting the server at login on macOS.
@@ -126,12 +137,12 @@ open in your browser.
 main.go                     flags, wiring, startup and shutdown
 classification.md           built-in generic prompt with a {{sections}} placeholder
 internal/appdir/            locates the data directory and seeds files into it
+internal/agent/             installs and removes the macOS LaunchAgent
 internal/launch/            hands a URL to the OS: the browser, or a file link
 internal/bookmarks/         data model, the JSON store, backups and URL keys
 internal/linkcheck/         concurrent dead-link checker
 internal/web/               HTTP handlers, the origin guard and the embedded UI
 internal/web/assets/        templates plus app.css and app.js
-launchd/                    LaunchAgent template and its installer
 screenshots/                README images and the Playwright script that makes them
 docs/                       documentation linked from this README
 ```

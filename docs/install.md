@@ -45,44 +45,65 @@ explicitly chosen classification file is never created for you.
 
 ## Starting at login (macOS)
 
-`launchd/install.sh` installs a per-user LaunchAgent that starts the server at
-GUI login and restarts it if it exits:
+`weblinks -install-agent` installs a per-user LaunchAgent that starts the
+server at GUI login and restarts it if it exits. It works however you
+installed the binary, and exits once the agent is loaded:
 
 ```
-./launchd/install.sh
-WEBLINKS_ADDR=127.0.0.1:9000 ./launchd/install.sh   # override before installing
+weblinks -install-agent
+weblinks -install-agent -addr 127.0.0.1:9000   # a different address
+weblinks -uninstall-agent
 ```
 
-The script builds the binary, renders `launchd/com.jftuga.weblinks.plist.template`
-with absolute paths into `~/Library/LaunchAgents/`, and bootstraps it. It is
-safe to re-run, which is also how you change `WEBLINKS_ADDR` or `WEBLINKS_DIR`
-afterwards; pass every override again, since each run starts from the
-defaults. The agent runs the binary in this repository but keeps its store,
+It writes `~/Library/LaunchAgents/com.jftuga.weblinks.plist` and loads it,
+replacing an agent that is already loaded, so running it again is how you
+change the settings later. Only `-addr`, `-dir` and `-allow-host` can be
+combined with it. They are written into the plist, and each run starts from
+the defaults, so pass every one of them again. The agent keeps its store,
 prompt and `weblinks.log` in the [data directory](#the-data-directory), which
-the script resolves when it runs and passes as `-dir`. launchd does not see
-your shell's environment, so re-run the script if you later change
-`XDG_CONFIG_HOME`. Edits to the classification file need no reinstall or
-restart.
+is resolved when you run `-install-agent` and written into the plist as an
+absolute `-dir`. launchd does not see your shell's environment, so run it
+again if you later change `XDG_CONFIG_HOME`. Edits to the classification file
+need no reinstall or restart.
+
+The agent runs the binary you invoked, by the path you invoked it with:
+`$(brew --prefix)/bin/weblinks` for Homebrew, or the absolute path of
+`./weblinks` in a clone or an unpacked release archive. That file must stay
+where it is. A `go run` build and Homebrew's versioned copy under `Caskroom/`
+are refused, because both disappear. Before the running agent is replaced,
+the new plist is checked with `plutil -lint`, and the install stops if
+something else already holds the address.
+
+`-uninstall-agent` stops the agent and deletes its plist, and leaves the data
+directory alone.
 
 | Task | Command |
 | --- | --- |
 | Status | `launchctl print gui/$(id -u)/com.jftuga.weblinks` |
-| Restart after `make build` | `launchctl kickstart -k gui/$(id -u)/com.jftuga.weblinks` |
-| Uninstall | `launchctl bootout gui/$(id -u)/com.jftuga.weblinks && rm ~/Library/LaunchAgents/com.jftuga.weblinks.plist` |
+| Restart | `launchctl kickstart -k gui/$(id -u)/com.jftuga.weblinks` |
+| Uninstall | `weblinks -uninstall-agent` |
 
-Four things to know:
+Things to know:
 
-- **Code changes need a rebuild.** `make build`, then `kickstart -k`. The
-  LaunchAgent environment has a minimal `PATH` without the Go toolchain, which
-  is why the script builds rather than deferring to launchd.
-- **`KeepAlive` is unconditional.** If something else already holds the port,
-  launchd restarts the failing server every ten seconds and the log fills with
-  `address already in use`. Stop any server you started by hand first.
-- **`gui/` means GUI login.** `install.sh` bootstraps the agent into your GUI
-  session, so connecting over SSH alone will not start it.
-- **Uninstalling needs both commands.** `bootout` only unloads the agent;
-  while the plist remains in `~/Library/LaunchAgents/`, launchd loads it again
-  at the next login.
+- **A new binary needs a restart.** The agent keeps running the old binary
+  until it restarts. In a clone, run `make build`, then `kickstart -k`.
+  `brew upgrade` restarts a loaded agent for you; if it is still on the old
+  version, run `kickstart -k` yourself.
+- **Run `weblinks -uninstall-agent` before `brew uninstall`.** A plain
+  `brew uninstall` removes the binary but leaves the agent loaded, and
+  launchd keeps trying to start the missing file. The cask cannot do better,
+  because Homebrew runs a cask's uninstall steps on every upgrade as well.
+  `brew uninstall --zap` does remove the agent, but leaves the data
+  directory.
+- **`KeepAlive` is unconditional.** If something else takes the port after
+  the install, a server you started by hand for example, launchd restarts the
+  failing server every ten seconds and the log fills with
+  `address already in use`.
+- **`gui/` means GUI login.** The agent is loaded into your GUI session, so
+  connecting over SSH alone will not start it.
+- **`bootout` alone does not uninstall.** While the plist remains in
+  `~/Library/LaunchAgents/`, launchd loads it again at the next login.
+  `-uninstall-agent` does both.
 
 The log at `weblinks.log` in the data directory is appended to and never
 rotated.

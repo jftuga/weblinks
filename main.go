@@ -3,8 +3,10 @@
 // address and optionally launches a browser at it. The store and the
 // classification prompt default to files in the data directory (-dir, or the
 // per-user directory from appdir), where the built-in prompt is written on
-// first run. The server has no authentication of any kind, so binding it to
-// anything other than localhost exposes the bookmark file to the network.
+// first run. -install-agent and -uninstall-agent manage the macOS LaunchAgent
+// that starts the server at login, and exit without serving. The server has
+// no authentication of any kind, so binding it to anything other than
+// localhost exposes the bookmark file to the network.
 package main
 
 import (
@@ -24,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jftuga/weblinks/internal/agent"
 	"github.com/jftuga/weblinks/internal/appdir"
 	"github.com/jftuga/weblinks/internal/bookmarks"
 	"github.com/jftuga/weblinks/internal/launch"
@@ -73,19 +76,72 @@ type config struct {
 	timeout     time.Duration
 	allowHosts  string
 	showVersion bool
+	// installAgent and uninstallAgent manage the LaunchAgent instead of
+	// serving.
+	installAgent   bool
+	uninstallAgent bool
+	// setFlags names the flags given on the command line, in lexical order.
+	setFlags []string
 }
+
+// installAgentFlags are the flags -install-agent accepts: the ones it writes
+// into the plist. The agent would silently ignore any other flag, so those
+// are rejected.
+var installAgentFlags = map[string]bool{"install-agent": true, "addr": true, "dir": true, "allow-host": true}
 
 func main() {
 	// Failing to find the default directory matters only when -dir is not
 	// given, so the error waits for checkDataDir instead of exiting here.
 	defaultDir, dirErr := appdir.Dir()
 	cfg := parseFlags(defaultDir)
+	exitOnError(checkAgentFlags(cfg))
 	if cfg.showVersion {
 		fmt.Printf("weblinks %s\n%s\n", resolveVersion(), programURL)
 		return
 	}
 	exitOnError(checkDataDir(cfg.dataDir, dirErr))
+	if cfg.installAgent || cfg.uninstallAgent {
+		exitOnError(manageAgent(cfg))
+		return
+	}
 	exitOnError(run(cfg))
+}
+
+// manageAgent carries out -install-agent or -uninstall-agent, once
+// checkAgentFlags has accepted the command line.
+func manageAgent(cfg config) error {
+	if cfg.uninstallAgent {
+		return agent.Uninstall()
+	}
+	// launchd has no working directory to resolve a relative path against.
+	dir, err := filepath.Abs(cfg.dataDir)
+	if err != nil {
+		return fmt.Errorf("resolve the data directory: %w", err)
+	}
+	return agent.Install(agent.Options{Addr: cfg.addr, DataDir: dir, AllowHosts: cfg.allowHosts})
+}
+
+// checkAgentFlags rejects -install-agent combined with -uninstall-agent or
+// with a flag the agent would not use, and -uninstall-agent combined with
+// any other flag.
+func checkAgentFlags(cfg config) error {
+	switch {
+	case cfg.installAgent && cfg.uninstallAgent:
+		return errors.New("-install-agent and -uninstall-agent cannot be combined")
+	case cfg.installAgent:
+		for _, name := range cfg.setFlags {
+			if !installAgentFlags[name] {
+				return fmt.Errorf("-%s cannot be combined with -install-agent, which accepts only -addr, -dir and -allow-host", name)
+			}
+		}
+	case cfg.uninstallAgent:
+		for _, name := range cfg.setFlags {
+			if name != "uninstall-agent" {
+				return fmt.Errorf("-%s cannot be combined with -uninstall-agent", name)
+			}
+		}
+	}
+	return nil
 }
 
 // checkDataDir rejects an empty data directory, reporting defaultErr as the
@@ -137,7 +193,10 @@ func parseFlags(defaultDir string) config {
 	flag.DurationVar(&cfg.timeout, "check-timeout", 10*time.Second, "per-request timeout for the dead-link checker")
 	flag.StringVar(&cfg.allowHosts, "allow-host", "", "comma-separated host names, besides localhost and IP addresses, that may reach the server")
 	flag.BoolVar(&cfg.showVersion, "version", false, "print the version and exit")
+	flag.BoolVar(&cfg.installAgent, "install-agent", false, "macOS: install a LaunchAgent that starts the server at login with -addr, -dir and -allow-host, then exit")
+	flag.BoolVar(&cfg.uninstallAgent, "uninstall-agent", false, "macOS: stop and remove the LaunchAgent, then exit")
 	flag.Parse()
+	flag.Visit(func(f *flag.Flag) { cfg.setFlags = append(cfg.setFlags, f.Name) })
 
 	if cfg.file == "" {
 		cfg.file = filepath.Join(cfg.dataDir, storeName)
