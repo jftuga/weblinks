@@ -6,6 +6,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -73,6 +74,42 @@ func TestCheckDataDir(t *testing.T) {
 	}
 	if err := checkDataDir("", nil); err == nil {
 		t.Error("an empty -dir was accepted")
+	}
+}
+
+func TestCheckAgentFlags(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		ok   bool
+	}{
+		{[]string{"-install-agent"}, true},
+		{[]string{"-install-agent", "-addr", "127.0.0.1:8080", "-dir", "/data", "-allow-host", "box.local"}, true},
+		{[]string{"-install-agent", "-file", "/data/store.json"}, false},
+		{[]string{"-install-agent", "-classification-file", "/data/prompt.md"}, false},
+		{[]string{"-install-agent", "-no-open"}, false},
+		{[]string{"-install-agent", "-version"}, false},
+		{[]string{"-install-agent", "-uninstall-agent"}, false},
+		{[]string{"-uninstall-agent"}, true},
+		{[]string{"-uninstall-agent", "-dir", "/data"}, false},
+		{[]string{"-file", "/data/store.json", "-no-open"}, true},
+	} {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			cfg := parseArgs(t, "/data", tc.args...)
+			if err := checkAgentFlags(cfg); (err == nil) != tc.ok {
+				t.Errorf("checkAgentFlags = %v, want ok=%v", err, tc.ok)
+			}
+		})
+	}
+}
+
+func TestAgentFlagsParse(t *testing.T) {
+	cfg := parseArgs(t, "/data", "-install-agent")
+	if !cfg.installAgent || cfg.uninstallAgent {
+		t.Errorf("-install-agent parsed as install=%v uninstall=%v", cfg.installAgent, cfg.uninstallAgent)
+	}
+	cfg = parseArgs(t, "/data", "-uninstall-agent")
+	if cfg.installAgent || !cfg.uninstallAgent {
+		t.Errorf("-uninstall-agent parsed as install=%v uninstall=%v", cfg.installAgent, cfg.uninstallAgent)
 	}
 }
 
