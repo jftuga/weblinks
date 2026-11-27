@@ -52,6 +52,13 @@ brew install --cask jftuga/tap/weblinks
 weblinks
 ```
 
+On macOS, run the server in the background now and at every login instead
+(see [starting at login](docs/install.md#starting-at-login-macos)):
+
+```
+weblinks -install-agent
+```
+
 Or build from a clone, which requires Go 1.27 or later:
 
 ```
@@ -59,9 +66,7 @@ make build
 ./weblinks
 ```
 
-A browser opens at <http://127.0.0.1:5309>. On macOS,
-`weblinks -install-agent` starts the server at login instead; see
-[starting at login](docs/install.md#starting-at-login-macos).
+A browser opens at <http://127.0.0.1:5309>.
 
 Everything the server keeps is in one data directory: `~/.config/weblinks/`,
 or `$XDG_CONFIG_HOME/weblinks/` when that is set, and `%AppData%\weblinks\`
