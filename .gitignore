@@ -17,3 +17,9 @@ weblinks.log
 .claude/settings.local.json
 .DS_Store
 *~
+
+# GoReleaser output
+/dist/
+
+# Local pull request drafts
+PR.md
