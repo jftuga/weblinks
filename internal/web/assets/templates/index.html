@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weblinks</title>
+<link rel="stylesheet" href="/static/app.css?v={{.AssetHash}}">
+<script>
+    // Applied before first paint so a dark-mode reload never flashes white.
+    try {
+        var pref = localStorage.getItem("weblinks.theme");
+        if (pref === "light" || pref === "dark") {
+            document.documentElement.dataset.theme = pref;
+        }
+    } catch (e) {}
+</script>
+</head>
+<body data-prefill-url="{{.PrefillURL}}" data-prefill-title="{{.PrefillTitle}}">
+
+<header class="topbar">
+    <div class="topbar-row">
+        <h1 id="page-title">Weblinks</h1>
+        <button type="button" id="title-rename" class="title-rename" title="Rename this page">rename</button>
+        <div class="actions">
+            <button type="button" id="add-btn" class="primary">Add weblink</button>
+            <button type="button" id="check-btn" title="Probe every URL and flag the dead ones">Check links</button>
+            <button type="button" id="backups-btn" title="Restore an earlier version of the weblinks file">Backups</button>
+            <a href="/bookmarklet" id="bookmarklet-link" title="Install the add-current-page bookmarklet">Bookmarklet</a>
+            <button type="button" id="theme-btn" title="Switch between automatic, light and dark">Theme: auto</button>
+        </div>
+    </div>
+    <div class="topbar-row search-row">
+        <button type="button" id="clear-search" class="clear-btn" title="Clear the search (Esc)" disabled>clear</button>
+        <input type="search" id="search" placeholder="Search weblinks    (press / to focus)" autocomplete="off" spellcheck="false">
+        <fieldset class="fields">
+            <legend class="visually-hidden">Fields to search</legend>
+            <label><input type="checkbox" id="field-title" checked> title</label>
+            <label><input type="checkbox" id="field-url" checked> url</label>
+            <label><input type="checkbox" id="field-notes" checked> notes</label>
+            <label><input type="checkbox" id="field-section" checked> section</label>
+        </fieldset>
+        <span id="result-count" class="result-count"></span>
+    </div>
+</header>
+
+<div class="layout">
+    <main id="sections" aria-live="polite"></main>
+    <div class="sidebar">
+        <aside id="recent" class="recent">
+            <h2>Recently clicked</h2>
+            <ol id="recent-list" class="recent-list"></ol>
+            <p id="recent-empty" class="muted">Nothing clicked yet.</p>
+        </aside>
+        <p class="version"><a href="{{.ProgramURL}}" target="_blank" rel="noopener noreferrer">weblinks {{.Version}}</a></p>
+    </div>
+</div>
+
+<dialog id="link-dialog">
+    <form id="link-form" method="dialog">
+        <h2 id="dialog-title">Add weblink</h2>
+
+        <label for="f-url">URL</label>
+        <input type="text" id="f-url" name="url" required autocomplete="off" spellcheck="false">
+
+        <label for="f-title">Title</label>
+        <input type="text" id="f-title" name="title" autocomplete="off">
+
+        <label for="f-notes">Notes</label>
+        <textarea id="f-notes" name="notes" rows="3" spellcheck="false"></textarea>
+
+        <div class="label-row">
+            <label for="f-section">Section</label>
+            <button type="button" id="classify-btn" class="help-btn" aria-label="How to choose a section" title="How to choose a section">?</button>
+        </div>
+        <select id="f-section" name="section"></select>
+        <input type="text" id="f-new-section" placeholder="New section name" autocomplete="off" hidden>
+
+        <label class="checkbox-row" for="f-skip">
+            <input type="checkbox" id="f-skip" name="skip_check">
+            <span>Exclude from link checking (for pages that need a sign-in)</span>
+        </label>
+
+        <p id="dialog-error" class="dialog-error" hidden></p>
+
+        <div class="dialog-actions">
+            <button type="button" id="delete-btn" class="danger" hidden>Delete</button>
+            <span class="spacer"></span>
+            <button type="button" id="cancel-btn">Cancel</button>
+            <button type="submit" id="save-btn" class="primary">Save</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="classify-dialog">
+    <div class="classify-head">
+        <h2>Choosing a section</h2>
+        <span class="spacer"></span>
+        <button type="button" id="classify-copy" class="primary">Copy prompt</button>
+        <button type="button" id="classify-close">Close</button>
+    </div>
+    <p class="muted classify-lede">Paste this into an LLM followed by the URL and title you want to file. It replies with one section name.</p>
+    <pre id="classify-body" class="classify-body">Loading…</pre>
+</dialog>
+
+<dialog id="backup-dialog">
+    <div class="classify-head">
+        <h2>Backups</h2>
+        <span class="spacer"></span>
+        <button type="button" id="backup-close">Close</button>
+    </div>
+    <p class="muted classify-lede">A backup is taken before every add, edit, delete and move. Restoring replaces every weblink with that version; the current one is backed up first, so a restore can itself be undone.</p>
+    <ul id="backup-list" class="backup-list"></ul>
+</dialog>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="/static/app.js?v={{.AssetHash}}"></script>
+</body>
+</html>

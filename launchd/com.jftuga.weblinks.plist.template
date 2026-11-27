@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    LaunchAgent template for weblinks. install.sh substitutes the {{...}}
+    placeholders with absolute paths and writes the result to
+    ~/Library/LaunchAgents/, because a LaunchAgent cannot expand ~ or read
+    environment variables the way a shell can. The agent runs the compiled
+    binary in the foreground and lets launchd supervise it, so this file
+    deliberately does not invoke `make daemon`, whose nohup-and-background
+    form would exit immediately and defeat KeepAlive.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>{{LABEL}}</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{BINARY}}</string>
+        <string>-addr</string>
+        <string>{{ADDR}}</string>
+        <string>-file</string>
+        <string>{{FILE}}</string>
+        <string>-classification-file</string>
+        <string>{{CLASSIFICATION_FILE}}</string>
+        <string>-no-open</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>{{WORKDIR}}</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>{{LOG}}</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{LOG}}</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

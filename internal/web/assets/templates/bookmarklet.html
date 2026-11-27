@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bookmarklet</title>
+<link rel="stylesheet" href="/static/app.css?v={{.AssetHash}}">
+<script>
+    try {
+        var pref = localStorage.getItem("weblinks.theme");
+        if (pref === "light" || pref === "dark") {
+            document.documentElement.dataset.theme = pref;
+        }
+    } catch (e) {}
+</script>
+</head>
+<body>
+
+<header class="topbar">
+    <div class="topbar-row">
+        <h1>Add-current-page bookmarklet</h1>
+        <div class="actions"><a href="/">Back to weblinks</a></div>
+    </div>
+</header>
+
+<main class="prose">
+    <p>Drag this link onto your browser's bookmarks bar:</p>
+
+    <p><a class="bookmarklet-drag" {{.Bookmarklet}}>New Weblink</a></p>
+
+    <p>Clicking it on any page opens a small window with the URL and title already filled in, so you only type the notes and pick a section.</p>
+
+    <h2>Notes</h2>
+    <ul>
+        <li>The server address <code>{{.BaseURL}}</code> is baked into the link. If you restart with a different <code>-addr</code>, come back to this page and drag the link again.</li>
+        <li>It opens a window rather than posting directly, so no website you visit can reach this server's API.</li>
+        <li>Saving closes the window automatically.</li>
+    </ul>
+
+    <h2>Source</h2>
+    <pre><code>javascript:(function(){
+  window.open(
+    '{{.BaseURL}}/add?url=' + encodeURIComponent(location.href) +
+      '&amp;title=' + encodeURIComponent(document.title),
+    'weblinks_add', 'width=640,height=640');
+})();</code></pre>
+</main>
+
+</body>
+</html>

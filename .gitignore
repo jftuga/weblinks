@@ -1,0 +1,19 @@
+# Build output
+/weblinks
+*.test
+*.out
+
+# Weblinks data and the pages it was imported from. Anchored to the repo root
+# so they cannot reach internal/web/assets, whose templates are go:embed'ed
+# and must stay tracked.
+/*.json
+/*.html
+backups/
+weblinks.log
+# Left behind only when an atomic store write is killed part way through.
+.weblinks-*.tmp
+
+# Local tool and editor state
+.claude/settings.local.json
+.DS_Store
+*~
