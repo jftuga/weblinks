@@ -16,6 +16,11 @@
 // never collide with a real one.
 const NEW_SECTION = "";
 
+// Sentinel value for the "Choose a section…" placeholder shown in the
+// bookmarklet's add dialog. The server trims section names, so a lone space
+// can never collide with a real section or with NEW_SECTION.
+const CHOOSE_SECTION = " ";
+
 // The fields a search can be restricted to, in the order their checkboxes
 // appear. Each name is both the state key and the id suffix of its checkbox.
 const SEARCH_FIELDS = ["title", "url", "notes", "section"];
@@ -578,15 +583,26 @@ function movePref(set, key, from, to) {
 
 /* --------------------------------------------------------------- dialog */
 
-/** Fills the section dropdown, selecting the given section when present. */
-function populateSections(selected) {
+/**
+ * Fills the section dropdown, selecting the given section when present.
+ * When requireChoice is set and no section is given, a disabled placeholder
+ * is selected instead of the first section, so the user must pick one.
+ */
+function populateSections(selected, requireChoice) {
     const names = state.doc.sections.map((s) => s.name);
     const options = names.map(
         (name) => '<option value="' + escapeHTML(name) + '">' + escapeHTML(name) + "</option>"
     );
     options.push('<option value="' + NEW_SECTION + '">New section…</option>');
+    let initial = names[0] || NEW_SECTION;
+    if (names.includes(selected)) {
+        initial = selected;
+    } else if (requireChoice && names.length > 0) {
+        options.unshift('<option value="' + CHOOSE_SECTION + '" disabled>Choose a section…</option>');
+        initial = CHOOSE_SECTION;
+    }
     el.section.innerHTML = options.join("");
-    el.section.value = names.includes(selected) ? selected : (names[0] || NEW_SECTION);
+    el.section.value = initial;
     syncNewSection();
 }
 
@@ -608,7 +624,7 @@ function openAddDialog(prefill) {
     el.title.value = (prefill && prefill.title) || "";
     el.notes.value = "";
     el.skip.checked = false;
-    populateSections(null);
+    populateSections(null, state.fromBookmarklet);
     showDialog();
 }
 
@@ -639,6 +655,10 @@ function showDialog() {
 
 /** Saves the dialog contents as a create or an update. */
 async function saveDialog() {
+    if (el.section.value === CHOOSE_SECTION) {
+        el.section.focus();
+        return showDialogError("Choose a section.");
+    }
     const section = el.section.value === NEW_SECTION ? el.newSection.value.trim() : el.section.value;
     if (!section) {
         return showDialogError("Give the new section a name.");
